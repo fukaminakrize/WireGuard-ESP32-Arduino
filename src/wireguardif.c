@@ -50,11 +50,15 @@
 #include "esp_log.h"
 #include "tcpip_adapter.h"
 
-#include "esp32-hal-log.h"
-
 #define WIREGUARDIF_TIMER_MSECS 400
 
 #define TAG "[WireGuard] "
+
+// From "esp32-hal-log.h"
+#define log_e(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_ERROR, TAG, format, ##__VA_ARGS__);}while(0)
+#define log_i(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, TAG, format, ##__VA_ARGS__);}while(0)
+#define log_v(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_VERBOSE, TAG, format, ##__VA_ARGS__);}while(0)
+#define log_d(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, TAG, format, ##__VA_ARGS__);}while(0)
 
 static void update_peer_addr(struct wireguard_peer *peer, const ip_addr_t *addr, u16_t port) {
 	peer->ip = *addr;
