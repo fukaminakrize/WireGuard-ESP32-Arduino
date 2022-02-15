@@ -925,8 +925,6 @@ err_t wireguardif_init(struct netif *netif) {
 	size_t private_key_len = sizeof(private_key);
 
 	struct netif* underlying_netif;
-	tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
-	log_i(TAG "underlying_netif = %p", underlying_netif);
 
 	LWIP_ASSERT("netif != NULL", (netif != NULL));
 	LWIP_ASSERT("state != NULL", (netif->state != NULL));
@@ -942,6 +940,13 @@ err_t wireguardif_init(struct netif *netif) {
 
 		// Clear out and set if function is successful
 		netif->state = NULL;
+
+		if (init_data->underlying_netif) {
+			underlying_netif = init_data->underlying_netif;
+		} else {
+			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
+		}
+		log_i(TAG "underlying_netif = %p", underlying_netif);
 
 		if (wireguard_base64_decode(init_data->private_key, private_key, &private_key_len)
 				&& (private_key_len == WIREGUARD_PRIVATE_KEY_LEN)) {
