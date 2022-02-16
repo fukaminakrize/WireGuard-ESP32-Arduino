@@ -50,15 +50,9 @@
 #include "esp_log.h"
 #include "tcpip_adapter.h"
 
+#define TAG "WireGuard"
+
 #define WIREGUARDIF_TIMER_MSECS 400
-
-#define TAG "[WireGuard] "
-
-// From "esp32-hal-log.h"
-#define log_e(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_ERROR, TAG, format, ##__VA_ARGS__);}while(0)
-#define log_i(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, TAG, format, ##__VA_ARGS__);}while(0)
-#define log_v(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_VERBOSE, TAG, format, ##__VA_ARGS__);}while(0)
-#define log_d(format, ...) do {ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, TAG, format, ##__VA_ARGS__);}while(0)
 
 static void update_peer_addr(struct wireguard_peer *peer, const ip_addr_t *addr, u16_t port) {
 	peer->ip = *addr;
@@ -137,7 +131,7 @@ static err_t wireguardif_output_to_peer(struct netif *netif, struct pbuf *q, con
 			// The IP packet consists of 16 byte header (struct message_transport_data), data padded upto 16 byte boundary + encrypted auth tag (16 bytes)
 			pbuf = pbuf_alloc(PBUF_TRANSPORT, header_len + padded_len + WIREGUARD_AUTHTAG_LEN, PBUF_RAM);
 			if (pbuf) {
-				log_v(TAG "preparing transport data...");
+				ESP_LOGV(TAG, "preparing transport data...");
 				// Note: allocating pbuf from RAM above guarantees that the pbuf is in one section and not chained
 				// - i.e payload points to the contiguous memory region
 				memset(pbuf->payload, 0, pbuf->tot_len);
@@ -220,7 +214,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 	if (wireguard_process_handshake_response(device, peer, response)) {
 		// Packet is good
 		// Update the peer location
-		log_i(TAG "good handshake from %08x:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGI(TAG, "good handshake from %08x:%d", addr->u_addr.ip4.addr, port);
 		update_peer_addr(peer, addr, port);
 
 		wireguard_start_session(peer, true);
@@ -230,7 +224,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 		netif_set_link_up(device->netif);
 	} else {
 		// Packet bad
-		log_i(TAG "bad handshake from %08x:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGI(TAG, "bad handshake from %08x:%d", addr->u_addr.ip4.addr, port);
 	}
 }
 
@@ -565,7 +559,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 	switch (type) {
 		case MESSAGE_HANDSHAKE_INITIATION:
 			msg_initiation = (struct message_handshake_initiation *)data;
-			log_i(TAG "HANDSHAKE_INITIATION: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "HANDSHAKE_INITIATION: %08x:%d", addr->u_addr.ip4.addr, port);
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
 			if (wireguardif_check_initiation_message(device, msg_initiation, addr, port)) {
 
@@ -581,7 +575,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_HANDSHAKE_RESPONSE:
-			log_i(TAG "HANDSHAKE_RESPONSE: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "HANDSHAKE_RESPONSE: %08x:%d", addr->u_addr.ip4.addr, port);
 			msg_response = (struct message_handshake_response *)data;
 
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
@@ -596,7 +590,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_COOKIE_REPLY:
-			log_i(TAG "COOKIE_REPLY: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "COOKIE_REPLY: %08x:%d", addr->u_addr.ip4.addr, port);
 			msg_cookie = (struct message_cookie_reply *)data;
 			peer = peer_lookup_by_handshake(device, msg_cookie->receiver);
 			if (peer) {
@@ -637,7 +631,7 @@ static err_t wireguard_start_handshake(struct netif *netif, struct wireguard_pee
 	pbuf = wireguardif_initiate_handshake(device, peer, &msg, &result);
 	if (pbuf) {
 		result = wireguardif_peer_output(netif, pbuf, peer);
-		log_i(TAG "start handshake %08x,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
+		ESP_LOGI(TAG, "start handshake %08x,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
 		pbuf_free(pbuf);
 		peer->send_handshake = false;
 		peer->last_initiation_tx = wireguard_sys_now();
@@ -794,7 +788,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 	}
 
 	uint32_t t2 = wireguard_sys_now();
-	log_i(TAG "Adding peer took %ums\r\n", (t2-t1));
+	ESP_LOGI(TAG, "Adding peer took %ums\r\n", (t2-t1));
 
 	if (peer_index) {
 		if (peer) {
@@ -931,7 +925,7 @@ err_t wireguardif_init(struct netif *netif) {
 
 	// We need to initialise the wireguard module
 	wireguard_init();
-	log_i(TAG "wireguard module initialized.");
+	ESP_LOGI(TAG, "wireguard module initialized.");
 
 	if (netif && netif->state) {
 
@@ -946,7 +940,7 @@ err_t wireguardif_init(struct netif *netif) {
 		} else {
 			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
 		}
-		log_i(TAG "underlying_netif = %p", underlying_netif);
+		ESP_LOGI(TAG, "underlying_netif = %p", underlying_netif);
 
 		if (wireguard_base64_decode(init_data->private_key, private_key, &private_key_len)
 				&& (private_key_len == WIREGUARD_PRIVATE_KEY_LEN)) {
@@ -963,12 +957,12 @@ err_t wireguardif_init(struct netif *netif) {
 						//udp_bind_netif(udp, underlying_netif);
 
 						device->udp_pcb = udp;
-						log_d(TAG "start device initialization");
+						ESP_LOGD(TAG, "start device initialization");
 						// Per-wireguard netif/device setup
 						uint32_t t1 = wireguard_sys_now();
 						if (wireguard_device_init(device, private_key)) {
 							uint32_t t2 = wireguard_sys_now();
-							log_d(TAG "Device init took %ums\r\n", (t2-t1));
+							ESP_LOGD(TAG,"Device init took %ums\r\n", (t2-t1));
 
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
 							NETIF_SET_CHECKSUM_CTRL(netif, NETIF_CHECKSUM_ENABLE_ALL);
@@ -991,32 +985,32 @@ err_t wireguardif_init(struct netif *netif) {
 
 							result = ERR_OK;
 						} else {
-							log_e(TAG "failed to initialize WireGuard device.");
+							ESP_LOGE(TAG, "failed to initialize WireGuard device.");
 							mem_free(device);
 							device = NULL;
 							udp_remove(udp);
 							result = ERR_ARG;
 						}
 					} else {
-						log_e(TAG "failed to allocate device context.");
+						ESP_LOGE(TAG, "failed to allocate device context.");
 						udp_remove(udp);
 						result = ERR_MEM;
 					}
 				} else {
-					log_e(TAG "failed to bind UDP err=%d", result);
+					ESP_LOGE(TAG, "failed to bind UDP err=%d", result);
 					udp_remove(udp);
 				}
 
 			} else {
-				log_e(TAG "failed to allocate UDP");
+				ESP_LOGE(TAG, "failed to allocate UDP");
 				result = ERR_MEM;
 			}
 		} else {
-			log_e(TAG "invalid init_data private key");
+			ESP_LOGE(TAG, "invalid init_data private key");
 			result = ERR_ARG;
 		}
 	} else {
-		log_e(TAG "netif or state is NULL: netif=%p, netif.state:%p", netif, netif ? netif->state : NULL);
+		ESP_LOGE(TAG, "netif or state is NULL: netif=%p, netif.state:%p", netif, netif ? netif->state : NULL);
 		result = ERR_ARG;
 	}
 	return result;
