@@ -58,7 +58,7 @@ struct wireguardif_init_data {
 	u16_t listen_port;
 	// Optional: restrict send/receive of encapsulated WireGuard traffic to this network interface only (NULL to use routing table)
 	struct netif *bind_netif;
-	// Optional: underlying network interface (NULL to use TCPIP_ADAPTER_IF_STA interface)
+	// Required: underlying network interface (NULL to use TCPIP_ADAPTER_IF_STA interface)
 	struct netif *underlying_netif;
 };
 

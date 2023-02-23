@@ -48,7 +48,6 @@
 #include "wireguard.h"
 #include "crypto.h"
 #include "esp_log.h"
-#include "tcpip_adapter.h"
 
 #define TAG "WireGuard"
 
@@ -214,7 +213,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 	if (wireguard_process_handshake_response(device, peer, response)) {
 		// Packet is good
 		// Update the peer location
-		ESP_LOGI(TAG, "good handshake from %08x:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGI(TAG, "good handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
 		update_peer_addr(peer, addr, port);
 
 		wireguard_start_session(peer, true);
@@ -224,7 +223,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 		netif_set_link_up(device->netif);
 	} else {
 		// Packet bad
-		ESP_LOGI(TAG, "bad handshake from %08x:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGI(TAG, "bad handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
 	}
 }
 
@@ -554,12 +553,12 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 	struct message_transport_data *msg_data;
 
 	uint8_t type = wireguard_get_message_type(data, len);
-	ESP_LOGV(TAG, "network_rx: %08x:%d", addr->u_addr.ip4.addr, port);
+	ESP_LOGV(TAG, "network_rx: %08lx:%d", addr->u_addr.ip4.addr, port);
 
 	switch (type) {
 		case MESSAGE_HANDSHAKE_INITIATION:
 			msg_initiation = (struct message_handshake_initiation *)data;
-			ESP_LOGI(TAG, "HANDSHAKE_INITIATION: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "HANDSHAKE_INITIATION: %08lx:%d", addr->u_addr.ip4.addr, port);
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
 			if (wireguardif_check_initiation_message(device, msg_initiation, addr, port)) {
 
@@ -575,7 +574,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_HANDSHAKE_RESPONSE:
-			ESP_LOGI(TAG, "HANDSHAKE_RESPONSE: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "HANDSHAKE_RESPONSE: %08lx:%d", addr->u_addr.ip4.addr, port);
 			msg_response = (struct message_handshake_response *)data;
 
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
@@ -590,7 +589,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_COOKIE_REPLY:
-			ESP_LOGI(TAG, "COOKIE_REPLY: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGI(TAG, "COOKIE_REPLY: %08lx:%d", addr->u_addr.ip4.addr, port);
 			msg_cookie = (struct message_cookie_reply *)data;
 			peer = peer_lookup_by_handshake(device, msg_cookie->receiver);
 			if (peer) {
@@ -604,7 +603,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_TRANSPORT_DATA:
-			ESP_LOGV(TAG, "TRANSPORT_DATA: %08x:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGV(TAG, "TRANSPORT_DATA: %08lx:%d", addr->u_addr.ip4.addr, port);
 
 			msg_data = (struct message_transport_data *)data;
 			peer = peer_lookup_by_receiver(device, msg_data->receiver);
@@ -631,7 +630,7 @@ static err_t wireguard_start_handshake(struct netif *netif, struct wireguard_pee
 	pbuf = wireguardif_initiate_handshake(device, peer, &msg, &result);
 	if (pbuf) {
 		result = wireguardif_peer_output(netif, pbuf, peer);
-		ESP_LOGI(TAG, "start handshake %08x,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
+		ESP_LOGI(TAG, "start handshake %08lx,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
 		pbuf_free(pbuf);
 		peer->send_handshake = false;
 		peer->last_initiation_tx = wireguard_sys_now();
@@ -788,7 +787,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 	}
 
 	uint32_t t2 = wireguard_sys_now();
-	ESP_LOGI(TAG, "Adding peer took %ums\r\n", (t2-t1));
+	ESP_LOGI(TAG, "Adding peer took %lums\r\n", (t2-t1));
 
 	if (peer_index) {
 		if (peer) {
@@ -935,11 +934,9 @@ err_t wireguardif_init(struct netif *netif) {
 		// Clear out and set if function is successful
 		netif->state = NULL;
 
-		if (init_data->underlying_netif) {
-			underlying_netif = init_data->underlying_netif;
-		} else {
-			tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
-		}
+        LWIP_ASSERT("init_data->underlying_netif != NULL", (init_data->underlying_netif != NULL));
+        underlying_netif = init_data->underlying_netif;
+
 		ESP_LOGI(TAG, "underlying_netif = %p", underlying_netif);
 
 		if (wireguard_base64_decode(init_data->private_key, private_key, &private_key_len)
@@ -962,7 +959,7 @@ err_t wireguardif_init(struct netif *netif) {
 						uint32_t t1 = wireguard_sys_now();
 						if (wireguard_device_init(device, private_key)) {
 							uint32_t t2 = wireguard_sys_now();
-							ESP_LOGD(TAG,"Device init took %ums\r\n", (t2-t1));
+							ESP_LOGD(TAG,"Device init took %lums\r\n", (t2-t1));
 
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
 							NETIF_SET_CHECKSUM_CTRL(netif, NETIF_CHECKSUM_ENABLE_ALL);
