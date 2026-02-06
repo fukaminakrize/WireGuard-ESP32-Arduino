@@ -60,6 +60,8 @@ struct wireguardif_init_data {
 	struct netif *bind_netif;
 	// Required: underlying network interface (NULL to use TCPIP_ADAPTER_IF_STA interface)
 	struct netif *underlying_netif;
+	// Optional: MTU
+	int mtu;
 };
 
 struct wireguardif_peer {
