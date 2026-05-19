@@ -544,8 +544,17 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 	// We have received a packet from the base_netif to our UDP port - process this as a possible Wireguard packet
 	struct wireguard_device *device = (struct wireguard_device *)arg;
 	struct wireguard_peer *peer;
+
+	// PPPoS reassembly can produce a chained pbuf; flatten it so the payload is contiguous
+	p = pbuf_coalesce(p, PBUF_RAW);
+	if (p->len < p->tot_len) {
+		// Coalesce failed (out of memory) — drop
+		pbuf_free(p);
+		return;
+	}
+
 	uint8_t *data = p->payload;
-	size_t len = p->len; // This buf, not chained ones
+	size_t len = p->len;
 
 	struct message_handshake_initiation *msg_initiation;
 	struct message_handshake_response *msg_response;
