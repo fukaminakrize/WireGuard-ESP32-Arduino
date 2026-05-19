@@ -213,7 +213,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 	if (wireguard_process_handshake_response(device, peer, response)) {
 		// Packet is good
 		// Update the peer location
-		ESP_LOGI(TAG, "good handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGD(TAG, "good handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
 		update_peer_addr(peer, addr, port);
 
 		wireguard_start_session(peer, true);
@@ -223,7 +223,7 @@ static void wireguardif_process_response_message(struct wireguard_device *device
 		netif_set_link_up(device->netif);
 	} else {
 		// Packet bad
-		ESP_LOGI(TAG, "bad handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
+		ESP_LOGD(TAG, "bad handshake from %08lx:%d", addr->u_addr.ip4.addr, port);
 	}
 }
 
@@ -567,7 +567,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 	switch (type) {
 		case MESSAGE_HANDSHAKE_INITIATION:
 			msg_initiation = (struct message_handshake_initiation *)data;
-			ESP_LOGI(TAG, "HANDSHAKE_INITIATION: %08lx:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGD(TAG, "HANDSHAKE_INITIATION: %08lx:%d", addr->u_addr.ip4.addr, port);
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
 			if (wireguardif_check_initiation_message(device, msg_initiation, addr, port)) {
 
@@ -583,7 +583,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_HANDSHAKE_RESPONSE:
-			ESP_LOGI(TAG, "HANDSHAKE_RESPONSE: %08lx:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGD(TAG, "HANDSHAKE_RESPONSE: %08lx:%d", addr->u_addr.ip4.addr, port);
 			msg_response = (struct message_handshake_response *)data;
 
 			// Check mac1 (and optionally mac2) are correct - note it may internally generate a cookie reply packet
@@ -598,7 +598,7 @@ void wireguardif_network_rx(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 			break;
 
 		case MESSAGE_COOKIE_REPLY:
-			ESP_LOGI(TAG, "COOKIE_REPLY: %08lx:%d", addr->u_addr.ip4.addr, port);
+			ESP_LOGD(TAG, "COOKIE_REPLY: %08lx:%d", addr->u_addr.ip4.addr, port);
 			msg_cookie = (struct message_cookie_reply *)data;
 			peer = peer_lookup_by_handshake(device, msg_cookie->receiver);
 			if (peer) {
@@ -639,7 +639,7 @@ static err_t wireguard_start_handshake(struct netif *netif, struct wireguard_pee
 	pbuf = wireguardif_initiate_handshake(device, peer, &msg, &result);
 	if (pbuf) {
 		result = wireguardif_peer_output(netif, pbuf, peer);
-		ESP_LOGI(TAG, "start handshake %08lx,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
+		ESP_LOGD(TAG, "start handshake %08lx,%d - %d", peer->ip.u_addr.ip4.addr, peer->port, result);
 		pbuf_free(pbuf);
 		peer->send_handshake = false;
 		peer->last_initiation_tx = wireguard_sys_now();
@@ -796,7 +796,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 	}
 
 	uint32_t t2 = wireguard_sys_now();
-	ESP_LOGI(TAG, "Adding peer took %lums\r\n", (t2-t1));
+	ESP_LOGD(TAG, "Adding peer took %lums\r\n", (t2-t1));
 
 	if (peer_index) {
 		if (peer) {
@@ -933,7 +933,7 @@ err_t wireguardif_init(struct netif *netif) {
 
 	// We need to initialise the wireguard module
 	wireguard_init();
-	ESP_LOGI(TAG, "wireguard module initialized.");
+	ESP_LOGD(TAG, "wireguard module initialized.");
 
 	if (netif && netif->state) {
 
@@ -946,7 +946,7 @@ err_t wireguardif_init(struct netif *netif) {
         LWIP_ASSERT("init_data->underlying_netif != NULL", (init_data->underlying_netif != NULL));
         underlying_netif = init_data->underlying_netif;
 
-		ESP_LOGI(TAG, "underlying_netif = %p", underlying_netif);
+		ESP_LOGD(TAG, "underlying_netif = %p", underlying_netif);
 
 		if (wireguard_base64_decode(init_data->private_key, private_key, &private_key_len)
 				&& (private_key_len == WIREGUARD_PRIVATE_KEY_LEN)) {
