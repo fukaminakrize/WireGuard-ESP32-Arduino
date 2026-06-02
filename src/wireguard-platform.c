@@ -8,34 +8,13 @@
 #include <stdlib.h>
 #include "crypto.h"
 #include "lwip/sys.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
 #include "esp_system.h"
 
-static struct mbedtls_ctr_drbg_context random_context;
-static struct mbedtls_entropy_context entropy_context;
-static bool is_platform_initialized = false;
-
-static int entropy_hw_random_source( void *data, unsigned char *output, size_t len, size_t *olen ) {
-    esp_fill_random(output, len);
-	*olen = len;
-    return 0;
-}
-
 void wireguard_platform_init() {
-	if( is_platform_initialized ) return;
-
-	mbedtls_entropy_init(&entropy_context);
-	mbedtls_ctr_drbg_init(&random_context);
-	mbedtls_entropy_add_source(&entropy_context, entropy_hw_random_source, NULL, 134, MBEDTLS_ENTROPY_SOURCE_STRONG);
-	mbedtls_ctr_drbg_seed(&random_context, mbedtls_entropy_func, &entropy_context, NULL, 0);
-
-	is_platform_initialized = true;
 }
 
 void wireguard_random_bytes(void *bytes, size_t size) {
-	uint8_t *out = (uint8_t *)bytes;
-	mbedtls_ctr_drbg_random(&random_context, bytes, size);
+	esp_fill_random(bytes, size);
 }
 
 uint32_t wireguard_sys_now() {
